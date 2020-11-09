@@ -1,0 +1,29 @@
+Test and Practice 1 - Basics
+
+Exercise 1: cf. tp1-ex1.cu
+
+Exercise 2: cf. demo1.cu
+
+The kernel function is called with the parameters <<<16, 4, 0>>> : That means we want to use 16 blocks with 4 threads each.
+The kernel function displays the number of the thread id followed by its block id separated with a comma, this is why we get two columns:
+thread_id, block_id.
+The thread_id will take 0 to 3 as a value and block_id will take 0 to 15 as a value. There will be 4*16=64 rows.
+The blocks are executed sequentially each but not necessarily in order, so the second column will have the same number 4 times in a row, 16 times.
+The threads are executed in parallel (but since the function only does one display we can't really see it) and not necessarily in order.
+
+Exercise 3: cf. demo2.cu and tp1-ex3.cu
+
+The demo2.cu works only partially because the checkrange(16777216) doesn't run the kernel. This is because, when calculating the number of the threads in a block (the second parameter within <<< and >>>), we get a number higher than 1024. Blocks cannot support more than 1024 threads so it cannot be performed and the kernel is not executed.
+To fix it we use the same calculation method as before but we clip it at 1024 if the result is higher:
+	nthreads = nthreads <= 1024 ? nthreads : 1024;
+	kernel<<<(uint32_t)dim, nthreads, 0>>>();
+
+Problem Mandelbrot: cf mandelbrot.cu
+
+Nota bene: SDL doesn't allow the printf function by itself as it uses a window as a display mode. To use printf on the console (for debug purposes) we can go to the file compile.cmd and change in --linker-options the /SUBSYSTEM:WINDOWS to /SUBSYSTEM:CONSOLE. Use the keyword `rem` to comment a line in .cmd files.
+
+The code can be found on the compute_iteration(...), iterate_cpu(...) and kernel_call(...) functions and the compute_iteration_gpu(...) and iterate_gpu(...) kernels.
+
+Using Nvidia RTX-2060 super I get an average of 7.0 FPS and 530 frame count.
+
+At the end of Mandelbrot it looks pixelised, as if the pixels got bigger. I don't know if it is due to some operations being poorly performed at the end.

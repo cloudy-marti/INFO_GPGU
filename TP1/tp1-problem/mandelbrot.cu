@@ -8,6 +8,8 @@
 #include <iostream>
 #include <complex>
 
+#include <thrust/complex.h>
+
 #define LEN 1024
 #define LENSHIFT 10
 #define ITERMAX 1024
@@ -24,21 +26,27 @@ uint32_t iterscpu[LEN*LEN];
 uint32_t colors[NCOLOR+1];
 uint32_t* iters;
 
-int compute_iteration(double i, double j, uint32_t itermax)
+// Do the mandelbrot computation
+uint32_t compute_iteration(double i, double j, uint32_t itermax)
 {
+    // use complex type from thrust to represent the complex number
     std::complex<double> z(0);
     std::complex<double> c(i, j);
 
-    int iter = 0;
+    uint32_t iter = 0;
     for (iter = 0; iter < itermax; iter++) {
+        // mandelbrot operation
         z = (z * z) + c;
+        // if the result is not within [-2, 2], break
         if(abs(z) >= 2) {
             break;
         }
     }
+    // if iter == ITERMAX-1, the pixel is within the mandelbrot suite
     return iter;
 }
 
+// Iterate through the 2D array to calculate mandelbrot for each pixel
 void iterate_cpu(uint32_t *arr, double x, double y, double delta, uint32_t itermax)
 {
     for (int i = 0; i < LEN; i++) {
@@ -51,17 +59,21 @@ void iterate_cpu(uint32_t *arr, double x, double y, double delta, uint32_t iterm
     return;
 }
 
+// Do the mandelbrot computation
+// Only a kernel function can be called within a kernel function
 __device__ uint32_t compute_iteration_gpu(double ci, double cj, int itermax) {
+    // Cannot use std so doing it manually
     // simulate imaginary number
-    double zreal = 0;
-    double zi = 0;
+    double zreal = 0;           // real part
+    double zi = 0;              // imaginary part
 
-    double zreal_result = 0;
-    double zi_result = 0;
+    double zreal_result = 0;    // real part
+    double zi_result = 0;       // imaginary part
 
-    uint32_t i;
-
-    for (i = 0; i < itermax; i++){
+    uint32_t iter = 0;
+    for (iter = 0; iter < itermax; iter++){
+        // mandelbrot operation
+        // do the complex operation manually
         zi = zreal * zi;
         zi += zi;
         zi += cj;
@@ -69,25 +81,39 @@ __device__ uint32_t compute_iteration_gpu(double ci, double cj, int itermax) {
         zreal_result = zreal * zreal;
         zi_result = zi * zi;
         // Only results bounded within [-2, 2] are taken in consideration
-        if (zreal_result + zi_result > 4.0) break;
+        if (zreal_result + zi_result > 4.0) {
+            break;  
+        } 
     }
-    
-    return i;
+    // if iter == ITERMAX-1, the pixel is within the mandelbrot suite
+    return iter;
 }
 
+// std cannot be used with CUDA
+// we can use insted thrust/complex.h from CUDA libraries
+// #include <thrust/complex.h>
+// thrust::complex<double> z(0);
+// thrust::complex<double> c(ci, cj);
+// for (iter = 0; iter < itermax; iter++){
+//     z = (z * z) + c;
+//     if (abs(z) >= 2) break;
+// }
+
+// Calculate mandelbrot using the GPU
+// Each thread will calculate mandelbrot for one pixel of the window
 __global__ void iterate_gpu(uint32_t* arr, double x, double y, double delta, uint32_t itermax){
     int t_id = blockDim.x * blockIdx.x + threadIdx.x;
-    for(int i = t_id; i < t_id + 1; i++) {
-        int xi = i % LEN;
-        int yj = i / LEN;
-        double ci = x + (yj * delta);
-        double cj = y - (xi * delta);
-        arr[getindex(xi, yj)] = compute_iteration_gpu(ci, cj, itermax);
-    }
+    // Get the corresponding pixel
+    int xi = t_id % LEN;
+    int yj = t_id / LEN;
+    double ci = x + (yj * delta);
+    double cj = y - (xi * delta);
+    arr[getindex(xi, yj)] = compute_iteration_gpu(ci, cj, itermax);
     return;
 }
 
 void kernel_call(uint32_t* arr, double x, double y, double delta, uint32_t itermax){
+    // Using 1024 blocks and 1024 threads for each block
     iterate_gpu<<<ITERMAX, ITERMAX, 0>>>(arr, x, y, delta, itermax);
     cudaDeviceSynchronize();
     return;

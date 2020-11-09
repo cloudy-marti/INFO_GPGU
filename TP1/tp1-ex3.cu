@@ -21,7 +21,9 @@ void checkrange(uint32_t range){
     double dim = sqrt(range);
     printf("Checking %u for sum-product numbers\n", range);
 
+    // calculate number of threads
     uint32_t nthreads = (uint32_t)ceil(range/(dim));
+    // check if number of threads is higher than 2014 and clip it if so
     nthreads = nthreads <= 1024 ? nthreads : 1024;
     kernel<<<(uint32_t)dim, nthreads, 0>>>();
     cudaDeviceSynchronize();
