@@ -22,7 +22,11 @@ __global__ void compute_parity_1(const uint32_t* arr, uint32_t* arr_res, uint32_
             uint64_t n = arr[tid];
             while(n != 1){
                 step++;
-                if(n%2) n = 3*n + 1; else n /= 2;
+                if(n%2) {
+                    n = 3*n + 1;  
+                } else { 
+                    n /= 2;
+                }
             }
             arr_res[tid] = step;
         }
@@ -90,7 +94,7 @@ int main() {
     sw2.start();
 	compute_parity_2<<<(1<<SHIFT-10), 1024>>>(arr_dev, arr_res_dev, arr_size);
     printf("%.4fms\n", sw2.stop());
-    
+
     // Free memory
     cudaFree(arr_dev);
     cudaFree(arr_res_dev);
